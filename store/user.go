@@ -77,7 +77,7 @@ func (us *UserStore) GetUser(username string) (models.User, error) {
 
 	for _, u := range users {
 		if u.Username == username {
-			token, err := Decrypt(u.DatabaseID, us.key)
+			token, err := Decrypt(u.NotionToken, us.key)
 			if err != nil {
 				return models.User{}, err
 			}
