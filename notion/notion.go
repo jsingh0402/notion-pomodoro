@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jsingh0402/notion-pomodoro/notion/config"
+	"github.com/jsingh0402/notion-pomodoro/config"
 )
 
 type NotionRequestBody struct {
@@ -18,9 +18,11 @@ type NotionRequestBody struct {
 func AddEntryToNotion(task string, topic string, duration int) error {
 	url := "https://api.notion.com/v1/pages"
 
+	// Load configuration
+	c := config.LoadConfig()
 	data := NotionRequestBody{
 		Parent: map[string]string{
-			"database_id": config.DatabaseID,
+			"database_id": c.DatabaseID,
 		},
 		Properties: map[string]interface{}{
 			"Session Name": map[string]interface{}{
@@ -57,7 +59,7 @@ func AddEntryToNotion(task string, topic string, duration int) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+config.NotionToken)
+	req.Header.Set("Authorization", "Bearer "+c.NotionToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", "2022-06-28")
 

@@ -7,12 +7,19 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jsingh0402/notion-pomodoro/config"
 	"github.com/jsingh0402/notion-pomodoro/notion"
 	"github.com/jsingh0402/notion-pomodoro/pomodoro"
 	"github.com/jsingh0402/notion-pomodoro/utils"
 )
 
 func main() {
+	err := config.LoadDotEnv(".env")
+	if err != nil {
+		utils.Error("Failed to load .env file: " + err.Error())
+		return
+	}
+
 	utils.Info("Welcome to Notion Pomodoro!")
 
 	// Set session duration (default: 25 min)
