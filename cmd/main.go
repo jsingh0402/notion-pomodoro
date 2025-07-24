@@ -1,60 +1,81 @@
 package main
 
 import (
-	"bufio"
+	"encoding/base64"
+	"flag"
 	"fmt"
+	"log"
 	"os"
-	"strconv"
-	"strings"
+	"path/filepath"
 
-	"github.com/jsingh0402/notion-pomodoro/config"
-	"github.com/jsingh0402/notion-pomodoro/notion"
-	"github.com/jsingh0402/notion-pomodoro/pomodoro"
-	"github.com/jsingh0402/notion-pomodoro/utils"
+	"github.com/jsingh0402/notion-pomodoro/models"
+	"github.com/jsingh0402/notion-pomodoro/store"
 )
 
 func main() {
-	err := config.LoadDotEnv(".env")
-	if err != nil {
-		utils.Error("Failed to load .env file: " + err.Error())
-		return
+	//CLI flags
+	var (
+		register    = flag.Bool("register", false, "Register a new user")
+		get         = flag.String("get", "", "Get user info by username")
+		username    = flag.String("username", "", "Username")
+		notionToken = flag.String("token", "", "Notion API Token")
+		notionDB    = flag.String("db", "", "Notion database ID")
+	)
+
+	flag.Parse()
+
+	// Load the secret key
+	secretKey := os.Getenv("POMODORO_SECRET_KEY")
+	if secretKey == "" {
+		log.Fatal("Environment variable POMODORO_SECRET_KEY is not set")
 	}
 
-	utils.Info("Welcome to Notion Pomodoro!")
+	key, err := base64.StdEncoding.DecodeString(secretKey)
+	if err != nil {
+		log.Fatalf("Invalid base64 in POMODORO_SECRET_KEY: %v", err)
+	}
 
-	// Set session duration (default: 25 min)
-	sessionDuration := 25
-	reader := bufio.NewReader(os.Stdin)
+	// Setup Store Path
+	home, _ := os.UserHomeDir()
+	storeDir := filepath.Join(home, ".notion-pomodoro")
+	err = os.Mkdir(storeDir, 0755)
+	if err != nil {
+		log.Fatalf("Failed to create store directory: %v", err)
+	}
 
-	fmt.Print("Enter session duration in minutes (press Enter to use 25): ")
-	durationInput, _ := reader.ReadString('\n')
-	durationInput = strings.TrimSpace(durationInput)
-	if durationInput != "" {
-		if val, err := strconv.Atoi(durationInput); err == nil {
-			sessionDuration = val
+	userStore := store.NewUserStore(storeDir, key)
+
+	switch {
+	case *register:
+		if *username == "" || *notionToken == "" || *notionDB == "" {
+			log.Fatal("--register requires --username, --token, --db")
 		}
+
+		user := models.User{
+			Username:    *username,
+			NotionToken: *notionToken,
+			DatabaseID:  *notionDB,
+		}
+
+		err := userStore.RegisterUser(user)
+		if err != nil {
+			log.Fatalf("RegisterUser failed: %v", err)
+		}
+		fmt.Println("User registered successfully.")
+
+	case *get != "":
+		user, err := userStore.GetUser(*get)
+		if err != nil {
+			log.Fatalf("GetUser failed: %v", err)
+		}
+
+		fmt.Println("Username: ", user.Username)
+		fmt.Println("NotionToken: ", user.NotionToken)
+		fmt.Println("DatabaseID: ", user.DatabaseID)
+
+	default:
+		fmt.Println("Pomodoro CLI")
+		flag.Usage()
 	}
 
-	utils.Info(fmt.Sprintf("Starting a %d-minute Pomodoro...", sessionDuration))
-
-	pomodoro.StartPomodoro(sessionDuration)
-
-	utils.Info("Pomodoro session completed!")
-
-	// Ask for log info
-	fmt.Print("Enter what you worked on this session: ")
-	task, _ := reader.ReadString('\n')
-	task = strings.TrimSpace(task)
-
-	fmt.Print("Enter category (DSA, Project, SD, etc.): ")
-	topic, _ := reader.ReadString('\n')
-	topic = strings.TrimSpace(topic)
-
-	// Log to Notion
-	err := notion.AddEntryToNotion(task, topic, sessionDuration)
-	if err != nil {
-		utils.Error("Failed to log to Notion: " + err.Error())
-	} else {
-		utils.Info("Successfully logged session to Notion.")
-	}
 }
